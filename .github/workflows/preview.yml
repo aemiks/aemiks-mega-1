@@ -1,0 +1,44 @@
+# Plan morning-digest § 3/§ 4 · ADR 0003. Saves /digest/<night> as one HTML file and deploys it to
+# GitHub Pages. The preview never enters git: it is built here and uploaded as a Pages artifact.
+# Run with the lane marker for review; run again with an empty marker to upload the clean copy
+# over the same link.
+name: preview
+on:
+  workflow_dispatch:
+    inputs:
+      night:
+        description: 'Night to preview (YYYY-MM-DD)'
+        default: '2026-10-28'
+      marker:
+        description: 'LANE_MARKER for the banner (empty = "no marker set")'
+        default: ''
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: pnpm install --frozen-lockfile
+      - name: Save the page
+        env:
+          LANE_MARKER: ${{ inputs.marker }}
+        run: pnpm exec tsx scripts/save-page.ts "/digest/${{ inputs.night }}" _site/index.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+          retention-days: 1
+      - id: deploy
+        uses: actions/deploy-pages@v4
